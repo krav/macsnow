@@ -13,7 +13,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "snowflake", accessibilityDescription: "xSnow")
+            button.image = NSImage(systemSymbolName: "snowflake", accessibilityDescription: "MacSnow")
         }
         
         let menu = NSMenu()
@@ -43,6 +43,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         settlingItem.target = self
         settlingItem.state = .on
         menu.addItem(settlingItem)
+        
+        let santaItem = NSMenuItem(title: "Santa Sleigh", action: #selector(toggleSanta), keyEquivalent: "")
+        santaItem.target = self
+        santaItem.state = .on
+        menu.addItem(santaItem)
         
         menu.addItem(NSMenuItem.separator())
         
@@ -91,6 +96,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let newState: NSControl.StateValue = settlingItem.state == .on ? .off : .on
             settlingItem.state = newState
             snowWindow?.setSettlingEnabled(newState == .on)
+        }
+    }
+    
+    @objc func toggleSanta() {
+        if let menu = statusItem?.menu,
+           let santaItem = menu.item(withTitle: "Santa Sleigh") {
+            let newState: NSControl.StateValue = santaItem.state == .on ? .off : .on
+            santaItem.state = newState
+            snowWindow?.setSantaEnabled(newState == .on)
         }
     }
     

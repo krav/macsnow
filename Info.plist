@@ -5,13 +5,13 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleExecutable</key>
-    <string>xSnow</string>
+    <string>MacSnow</string>
     <key>CFBundleIdentifier</key>
-    <string>com.xsnow.macOS</string>
+    <string>com.macsnow.macOS</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>xSnow</string>
+    <string>MacSnow</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

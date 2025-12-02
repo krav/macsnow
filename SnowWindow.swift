@@ -39,4 +39,8 @@ class SnowWindow: NSWindow {
     func setSettlingEnabled(_ enabled: Bool) {
         snowView?.setSettlingEnabled(enabled)
     }
+    
+    func setSantaEnabled(_ enabled: Bool) {
+        snowView?.setSantaEnabled(enabled)
+    }
 }

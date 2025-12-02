@@ -30,14 +30,20 @@ class SnowView: NSView {
     private var intensity: SnowIntensity = .medium
     private var windEnabled: Bool = true
     private var settlingEnabled: Bool = true
+    private var santaEnabled: Bool = true
     private var windPhase: CGFloat = 0
     private var windowDetector = WindowDetector()
     private var settledSnowManager = SettledSnowManager()
     private var lastUpdateTime: Date = Date()
+    private var santa: SantaSleigh?
+    private var nextSantaTime: TimeInterval = 0
+    private var timeSinceStart: TimeInterval = 0
     
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         self.wantsLayer = true
+        santa = SantaSleigh(screenBounds: frameRect)
+        scheduleNextSanta()
     }
     
     required init?(coder: NSCoder) {
@@ -47,10 +53,15 @@ class SnowView: NSView {
     func startAnimation() {
         createParticles()
         lastUpdateTime = Date()
+        timeSinceStart = 0
         timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
             self?.updateParticles()
             self?.needsDisplay = true
         }
+    }
+    
+    private func scheduleNextSanta() {
+        nextSantaTime = TimeInterval.random(in: 30...120)
     }
     
     func setIntensity(_ intensity: SnowIntensity) {
@@ -67,6 +78,10 @@ class SnowView: NSView {
         if !enabled {
             settledSnowManager.clear()
         }
+    }
+    
+    func setSantaEnabled(_ enabled: Bool) {
+        self.santaEnabled = enabled
     }
     
     private func createParticles() {
@@ -94,12 +109,25 @@ class SnowView: NSView {
         let deltaTime = now.timeIntervalSince(lastUpdateTime)
         lastUpdateTime = now
         
+        if santaEnabled {
+            timeSinceStart += deltaTime
+            
+            if timeSinceStart >= nextSantaTime {
+                santa?.startFlight()
+                timeSinceStart = 0
+                scheduleNextSanta()
+            }
+            
+            santa?.update()
+        }
+        
         windPhase += 0.02
         let windEffect = windEnabled ? sin(windPhase) * 0.5 : 0
         
         let visibleWindows = settlingEnabled ? windowDetector.getVisibleWindows() : []
         if settlingEnabled {
             settledSnowManager.update(deltaTime: deltaTime, visibleWindows: visibleWindows)
+            settledSnowManager.removeOccludedSnow(windowDetector: windowDetector, allWindows: visibleWindows)
         }
         
         for i in 0..<particles.count {
@@ -128,23 +156,26 @@ class SnowView: NSView {
     private func checkCollisionWithWindows(particle: SnowParticle, windows: [WindowInfo]) -> Bool {
         let particlePoint = CGPoint(x: particle.x, y: particle.y)
         
-        for window in windows {
-            let topEdge = window.frame.maxY
-            let snowHeight = settledSnowManager.getSnowHeight(on: window.frame)
-            let collisionY = topEdge + snowHeight
+        guard let topmostWindow = windowDetector.getTopmostWindow(at: particlePoint, from: windows) else {
+            return false
+        }
+        
+        let topEdge = topmostWindow.frame.maxY
+        let snowHeight = settledSnowManager.getSnowHeight(on: topmostWindow.windowID)
+        let collisionY = topEdge + snowHeight
+        
+        if particle.y <= collisionY &&
+           particle.y >= collisionY - particle.speed * 2 {
             
-            if particle.y <= collisionY &&
-               particle.y >= collisionY - particle.speed &&
-               particle.x >= window.frame.minX &&
-               particle.x <= window.frame.maxX {
-                
+            let landingPoint = CGPoint(x: particle.x, y: topEdge + snowHeight)
+            if !windowDetector.isPointOccluded(point: landingPoint, byWindowsInFrontOf: topmostWindow, allWindows: windows) {
                 settledSnowManager.addSnowParticle(
                     at: particlePoint,
                     size: particle.size,
-                    on: window.frame
+                    on: topmostWindow
                 )
-                return true
             }
+            return true
         }
         
         return false
@@ -171,6 +202,10 @@ class SnowView: NSView {
         if settlingEnabled {
             drawSnowPiles(context: context)
         }
+        
+        if santaEnabled {
+            santa?.draw(context: context)
+        }
     }
     
     private func drawSnowPiles(context: CGContext) {
@@ -182,47 +217,78 @@ class SnowView: NSView {
             
             let windowTop = pile.windowFrame.maxY
             let windowLeft = pile.windowFrame.minX
+            let windowRight = pile.windowFrame.maxX
+            let cornerRadius: CGFloat = 10.0
             
-            for (columnX, column) in sortedColumns {
-                let absoluteX = windowLeft + columnX
-                let height = column.height
-                let age = column.age
-                let opacity = max(0.7, 1.0 - CGFloat(age / pile.maxAge))
-                
-                let path = CGMutablePath()
-                let baseY = windowTop
-                let topY = windowTop + height
-                
-                let leftX = absoluteX
-                let rightX = absoluteX + pile.columnWidth
-                
-                path.move(to: CGPoint(x: leftX, y: baseY))
-                
-                let controlHeight = height * 0.7
-                path.addCurve(
-                    to: CGPoint(x: leftX + pile.columnWidth / 2, y: topY),
-                    control1: CGPoint(x: leftX, y: baseY + controlHeight),
-                    control2: CGPoint(x: leftX + pile.columnWidth * 0.3, y: topY - 2)
-                )
-                
-                path.addCurve(
-                    to: CGPoint(x: rightX, y: baseY),
-                    control1: CGPoint(x: rightX - pile.columnWidth * 0.3, y: topY - 2),
-                    control2: CGPoint(x: rightX, y: baseY + controlHeight)
-                )
-                
-                path.closeSubpath()
-                
-                context.setAlpha(opacity)
-                context.addPath(path)
-                context.fillPath()
-                
-                context.setAlpha(opacity * 0.5)
-                context.setStrokeColor(NSColor.white.cgColor)
-                context.setLineWidth(0.5)
-                context.addPath(path)
-                context.strokePath()
+            let avgAge = pile.getAverageAge()
+            let fadeStartAge: TimeInterval = 240.0
+            let opacity: CGFloat
+            if avgAge < fadeStartAge {
+                opacity = 0.95
+            } else {
+                let fadeProgress = (avgAge - fadeStartAge) / (pile.maxAge - fadeStartAge)
+                opacity = max(0.3, 0.95 - CGFloat(fadeProgress) * 0.65)
             }
+            
+            let path = CGMutablePath()
+            
+            var points: [(x: CGFloat, y: CGFloat)] = []
+            for (columnX, column) in sortedColumns {
+                let absoluteX = windowLeft + columnX + pile.columnWidth / 2
+                let topY = windowTop + column.height
+                points.append((x: absoluteX, y: topY))
+            }
+            
+            guard !points.isEmpty else { continue }
+            
+            let leftBound = windowLeft + cornerRadius
+            let rightBound = windowRight - cornerRadius
+            
+            let firstPoint = points[0]
+            let lastPoint = points[points.count - 1]
+            
+            let startX = min(max(firstPoint.x, leftBound), rightBound)
+            path.move(to: CGPoint(x: startX, y: windowTop))
+            
+            if points.count == 1 {
+                let p = points[0]
+                path.addLine(to: CGPoint(x: startX, y: p.y))
+                path.addLine(to: CGPoint(x: startX, y: windowTop))
+            } else {
+                for i in 0..<points.count {
+                    let p = points[i]
+                    let clampedX = min(max(p.x, leftBound), rightBound)
+                    let point = CGPoint(x: clampedX, y: p.y)
+                    
+                    if i == 0 {
+                        path.addLine(to: point)
+                    } else {
+                        let prevP = points[i - 1]
+                        let prevClampedX = min(max(prevP.x, leftBound), rightBound)
+                        let controlX = (prevClampedX + clampedX) / 2
+                        let controlY = (prevP.y + p.y) / 2 + abs(prevP.y - p.y) * 0.2
+                        path.addQuadCurve(to: point, control: CGPoint(x: controlX, y: controlY))
+                    }
+                }
+                
+                let endX = min(max(lastPoint.x, leftBound), rightBound)
+                path.addLine(to: CGPoint(x: endX, y: windowTop))
+            }
+            
+            path.closeSubpath()
+            
+            context.saveGState()
+            context.setAlpha(opacity)
+            context.addPath(path)
+            context.setFillColor(NSColor.white.cgColor)
+            context.fillPath()
+            
+            context.setAlpha(opacity * 0.7)
+            context.addPath(path)
+            context.setStrokeColor(NSColor.white.withAlphaComponent(0.8).cgColor)
+            context.setLineWidth(1.0)
+            context.strokePath()
+            context.restoreGState()
         }
     }
 }
