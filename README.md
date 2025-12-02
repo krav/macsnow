@@ -22,6 +22,9 @@ cd macsnow
 # Build the application
 make
 
+# Run without installing
+make run
+
 # Install to Applications folder
 make install
 ```
