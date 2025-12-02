@@ -8,6 +8,7 @@ Vibe coded holiday nostalgia for the Apple operating system.
 
 - Snow
 - Santa
+- Bugs
 
 ## Requirements
 
