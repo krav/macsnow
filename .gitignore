@@ -1,0 +1,19 @@
+# Build artifacts
+build/
+*.app
+
+# Xcode
+*.xcodeproj
+*.xcworkspace
+*.swiftpm
+.DS_Store
+
+# Swift
+*.swiftmodule
+*.swiftdoc
+*.dSYM.zip
+*.dSYM
+
+# Temporary files
+*~
+.*.swp
