@@ -16,9 +16,6 @@ Vibe coded xmas nostalgia for the Apple operating system.
 ### Option 1: Build from Source
 
 ```bash
-# Clone or download this repository
-cd macsnow
-
 # Build the application
 make
 
