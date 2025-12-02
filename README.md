@@ -1,10 +1,13 @@
 # xsnow for MacOS
 
-Vibe coded xmas nostalgia for the Apple operating system.
+Vibe coded holiday nostalgia for the Apple operating system.
 
 ![MacSnow Screenshot](screenshot.png)
 
 ## Features
+
+- Snow
+- Santa
 
 ## Requirements
 
